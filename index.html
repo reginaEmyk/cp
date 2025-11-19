@@ -185,28 +185,42 @@ if (d[i][k] &lt; INF && d[k][j] &lt; INF)
   </section>
 </main>
 
+<section class="content-section">
+  <div>
+    <h2 >Vantegens</h2>
+
+    <p>
+      Aceita arestas negativas
+    </p>
+    <p>
+      Aceita grafos direcionados
+    </p>
+    <p>
+      Fácil implementação
+    </p>
+
+    <section class="content-section">
+      <div>
+        <h2 >Desantegens</h2>
+    
+        <p>
+          Não funciona se houverem cliques negativos
+        </p>
+        <p>
+          Alto custo
+        </p>
+    
 <!-- Comparativo, gráfico e o TODO implementado -->
 <section id="comparativoSection">
   <div>
     <h2 id="comparacao">Dijkstra vs Floyd-Warshall em diferentes grafos</h2>
 
-    <p>
-      <strong>Dijkstra (com heap):</strong>
-      <span style="font-family: 'Latin Modern Math', serif;">
-        \( \mathcal{O}(m \log n) \)
-      </span>
-      <br>
-      <strong>Floyd–Warshall:</strong>
-      <span style="font-family: 'Latin Modern Math', serif;">
-        \( \mathcal{O}(n^{3}) \)
-      </span>
-    </p>
-
+<!-- deu ruim eu n sei calcular isso n e taoo interessante
     <p>
       Para este trabalho, considere:<br>
       • "poucos" = \(10^{2}\)<br>
       • "muitos" = \(3 \times 10^{2}\)
-    </p>
+    </p> -->
 
     <p>
       Floyd–Warshall: \( \mathcal{O}(n^{3}) \) <br>
@@ -225,9 +239,6 @@ if (d[i][k] &lt; INF && d[k][j] &lt; INF)
       <div class="destaque">Dijkstra &lt; FW quando m &lt; y</div>
     </div>
 
-    <p><strong>Resumo:</strong>
-      — Floyd-Warshall é bom para <strong>todos os pares</strong> quando <strong>n é pequeno</strong>.  
-      — Dijkstra é melhor quando o grafo é <strong>grande</strong> ou quando precisamos apenas de <strong> poucos pares </strong>.
     </p>
   </div>
 </section>
@@ -262,15 +273,15 @@ for (int inter = 0; inter < k; inter++) { // limite o loop externo
     <h2 id="minimax">É possível adaptar o algoritmo para calcular o caminho que minimiza o peso da maior aresta?</h2>
 
     <p>
-      Sim, substitua a operação soma por "máximo", e min por "minimização do maior custo". 
+      Sim, substitua a operação soma por "máximo" (calcule o peso do caminho como o peso da maior aresta), e permaneca selecionando o caminho de menor peso. 
     </p>
-    <!-- TODO review -->
+
 
     <pre style="background:#000;padding:1rem;border-radius:8px"><code>
 // Floyd-Warshall para caminho minimax
-for (int k = 1; k <= n; k++) {
-    for (int i = 1; i <= n; i++) {
-        for (int j = 1; j <= n; j++) {
+for (int k = 0; k < n; k++) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
             d[i][j] = min(
                 d[i][j],
                 max(d[i][k], d[k][j]) // custo = maior aresta do caminho
