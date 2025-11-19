@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Visualizador Interativo — Floyd–Warshall</title>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{ --bg:#0b0b0b; --panel:#141414; --muted:#bdbdbd; --accent:#2dd4bf; }
+    body{
+      font-family: Inter, Arial, sans-serif;
+      background:var(--bg);
+      color:#eee;
+      margin:0;
+      display:flex;
+      flex-direction:column;
+      min-height:100vh;
+      font-size:20px;
+    }
+    header{ padding:1rem; background:#0f1720; text-align:center; font-size:2rem; font-weight:600; }
+    #explanation{ padding:1.2rem 2rem; background:var(--panel); line-height:1.6; font-size:1.15rem; }
+    main{
+      display:grid;
+      grid-template-columns:3fr 3fr;
+      gap:0;
+      flex:1;
+      min-height:420px;
+      margin-bottom: 2rem;
+    }
+    #graphArea{
+      border-right:2px solid #111;
+      padding:1rem;
+      display: flex;
+      flex-direction: column;
+    }
+    #matrixArea{ padding:1rem; overflow-y:auto; }
+    table{ border-collapse:collapse; margin-top:1rem; font-size:1.05rem; }
+    td,th{ border:1px solid #444; padding:12px 14px; }
+    .highlight{ background:#2b2b2b; }
+
+    canvas{
+      background:#0e0f13;
+      width:100%;
+      flex:1;
+      display:block;
+      border-radius:8px;
+      min-height: 420px;
+    }
+
+    #codeBox{
+      background:#050607; padding:1rem; margin-top:1rem;
+      border-radius:8px; white-space:pre-wrap;
+      font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size:1.05rem; max-height:360px; overflow:auto;
+    }
+    button{
+      margin-top:1rem; padding:0.8rem 1.2rem; font-size:1.05rem;
+      background:#0b1220; border:1px solid #2b2b2b;
+      color:var(--muted); border-radius:8px; cursor:pointer;
+    }
+    .controls{ display:flex; gap:0.6rem; align-items:center; margin-top:0.8rem; }
+    .references {
+      padding:1.2rem 2rem;
+      background:#070708;
+      color:var(--muted);
+      font-size:0.95rem;
+      margin-top: auto;
+    }
+
+    /* área do comparativo / gráfico */
+    #comparativoSection{
+      padding:1rem 2rem;
+      grid-column: 1 / span 2;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+      border-top:1px solid #111;
+      margin-top: 2rem;
+    }
+
+    #plotContainer{
+      margin-top: 0.6rem;
+      display:flex;
+      flex-direction:column;
+      gap:0.6rem;
+    }
+
+    #plotCanvas{
+      width:100%;
+      height:300px;
+      background:#0f1720;
+      border-radius:8px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.6) inset;
+      cursor: crosshair;
+    }
+
+    .plot-caption{
+      color:var(--muted);
+      font-size:0.95rem;
+    }
+
+    .destaque{
+      color:var(--accent);
+      font-weight:700;
+      margin-top:0.4rem;
+    }
+    
+    .content-section {
+      padding: 1.5rem 2rem;
+      margin-bottom: 1.5rem;
+      background: var(--panel);
+      border-radius: 8px;
+    }
+    
+    .references ul {
+      padding-left: 1.5rem;
+    }
+    
+    .references li {
+      margin-bottom: 0.5rem;
+    }
+    
+    .references a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    
+    .references a:hover {
+      text-decoration: underline;
+    }
+    
+    .tooltip {
+      position: absolute;
+      background: rgba(20, 20, 20, 0.95);
+      border: 1px solid #2dd4bf;
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      pointer-events: none;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+<header>Algoritmo de Floyd–Warshall — Visualização Interativa</header>
+
+<!-- https://cses.fi/problemset/task/1672 -->
+<iframe height="1000px" src="https://cses.fi/problemset/task/1672"></iframe>
+
+<section id="explanation">
+  <h2>Ideia Principal</h2>
+  <p>A ideia central do algoritmo é verificar, para cada par <b>(i, j)</b>,
+    se existe um caminho via <b>k</b> que seja mais barato. O teste é:</p>
+
+  <pre style="background:#000;padding:1rem;border-radius:8px">
+if (d[i][k] &lt; INF && d[k][j] &lt; INF)
+    d[i][j] = min(d[i][j], d[i][k] + d[k][j]);
+  </pre>
+
+  <p>
+    Ou seja: só somamos <code>d[i][k] + d[k][j]</code> se ambos forem válidos.
+  </p>
+</section>
+
+<main>
+  <section id="graphArea">
+    <h2>Visualização Detalhada do Algoritmo</h2>
+
+    <canvas id="graphCanvas"></canvas>
+
+    <div class="controls">
+      <button id="prevStep">Passo Anterior</button>
+      <button id="nextStep">Próximo Passo</button>
+    </div>
+
+    <div id="status" style="margin-top:0.6rem; color:var(--muted)"></div>
+  </section>
+
+  <section id="matrixArea">
+    <h2>Matriz de Distâncias</h2>
+    <div id="matrixContainer"></div>
+
+    <h3>Trecho de Código</h3>
+    <div id="codeBox"></div>
+  </section>
+</main>
+
+<!-- Comparativo, gráfico e o TODO implementado -->
+<section id="comparativoSection">
+  <div>
+    <h2 id="comparacao">Dijkstra vs Floyd-Warshall em diferentes grafos</h2>
+
+    <p>
+      <strong>Dijkstra (com heap):</strong>
+      <span style="font-family: 'Latin Modern Math', serif;">
+        \( \mathcal{O}(m \log n) \)
+      </span>
+      <br>
+      <strong>Floyd–Warshall:</strong>
+      <span style="font-family: 'Latin Modern Math', serif;">
+        \( \mathcal{O}(n^{3}) \)
+      </span>
+    </p>
+
+    <p>
+      Para este trabalho, considere:<br>
+      • "poucos" = \(10^{2}\)<br>
+      • "muitos" = \(3 \times 10^{2}\)
+    </p>
+
+    <p>
+      Floyd–Warshall: \( \mathcal{O}(n^{3}) \) <br>
+      Dijkstra (heap, single-source): \( \mathcal{O}(m \log n) \) <br>
+      Dijkstra (heap, todos os pares): \( \mathcal{O}(n\,m\log n)\)<br>
+      Dijkstra &lt; FW quando: \( m < \dfrac{n^{2}}{\log n} \)
+    </p>
+
+    <div id="plotContainer">
+      <canvas id="plotCanvas"></canvas>
+      <div class="plot-caption">
+        Gráfico de \(y=\dfrac{x^{2}}{\log x}\) para \(x\in[2, 500]\). Passe o mouse sobre o gráfico para ver os valores.
+        Dijkstra é mais eficiente quando \(m\) está abaixo da curva, Floyd-Warshall quando está acima.
+      </div>
+      <!-- frase solicitada -->
+      <div class="destaque">Dijkstra &lt; FW quando m &lt; y</div>
+    </div>
+
+    <p><strong>Resumo:</strong>
+      — Floyd-Warshall é bom para <strong>todos os pares</strong> quando <strong>n é pequeno</strong>.  
+      — Dijkstra é melhor quando o grafo é <strong>grande</strong> ou quando precisamos apenas de <strong> poucos pares </strong>.
+    </p>
+  </div>
+</section>
+
+<section class="content-section">
+  <div>
+    <h2 id="kvertices">Como calcular o menor caminho passando por até k vértices?</h2>
+
+    <p>
+      Limite o loop externo:
+    </p>
+
+    <pre style="background:#000;padding:1rem;border-radius:8px"><code>
+      n = vertices;
+for (int inter = 0; inter < k; inter++) { // limite o loop externo
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            d[i][j] = min(d[i][j], d[i][inter] + d[inter][j]);
+        }
+    }
+}
+    </code></pre>
+
+    <p>
+      
+    </p>
+  </div>
+</section>
+
+<section class="content-section">
+  <div>
+    <h2 id="minimax">É possível adaptar o algoritmo para calcular o caminho que minimiza o peso da maior aresta?</h2>
+
+    <p>
+      Sim, substitua a operação soma por "máximo", e min por "minimização do maior custo". 
+    </p>
+    <!-- TODO review -->
+
+    <pre style="background:#000;padding:1rem;border-radius:8px"><code>
+// Floyd-Warshall para caminho minimax
+for (int k = 1; k <= n; k++) {
+    for (int i = 1; i <= n; i++) {
+        for (int j = 1; j <= n; j++) {
+            d[i][j] = min(
+                d[i][j],
+                max(d[i][k], d[k][j]) // custo = maior aresta do caminho
+            );
+        }
+    }
+}
+    </code></pre>
+
+    <p>
+      Isso calcula o caminho onde o "custo" de um caminho é definido como a maior aresta contida nele, e buscamos minimizar esse valor.
+    </p>
+  </div>
+</section>
+
+<section class="references">
+  <strong>Referências:</strong>
+  <ul>
+    <li><a href="https://cp-algorithms.com/graph/all-pair-shortest-path-floyd-warshall.html">CP-Algorithms — Floyd–Warshall</a></li>
+  </ul>
+</section>
+
+<script>
+// ---------------------
+const n = 4;
+const edges = [ [0,1,5], [0,2,9], [1,2,3] ];
+const BIG = 1e15;
+
+let dist = Array.from({length:n}, ()=>Array(n).fill(BIG));
+for(let a=0;a<n;a++) dist[a][a]=0;
+edges.forEach(([a,b,c])=>{ dist[a][b]=c; dist[b][a]=c; });
+
+let state = {k:0,i:0,j:0};
+let history = [];
+
+function snapshot(){
+  history.push({k:state.k,i:state.i,j:state.j,dist:dist.map(r=>r.slice())});
+}
+snapshot();
+
+// ---- ALGORITMO COMPLETO (j = 0..n-1) ----
+function stepForward(){
+  if(state.k >= n) return false;
+
+  const {k,i,j}=state;
+
+  const dik = dist[i][k];
+  const dkj = dist[k][j];
+
+  if(dik < BIG && dkj < BIG){
+    const sum = dik + dkj;
+    if(sum < dist[i][j]){
+      dist[i][j] = sum;
+    }
+  }
+
+  state.j++;
+  if(state.j >= n){ state.i++; state.j = 0; }
+  if(state.i >= n){ state.k++; state.i = 0; state.j = 0; }
+
+  snapshot();
+  return true;
+}
+
+function stepBackward(){
+  if(history.length<=1) return false;
+  history.pop();
+  const last=history[history.length-1];
+  state.k=last.k; state.i=last.i; state.j=last.j;
+  dist=last.dist.map(r=>r.slice());
+  return true;
+}
+
+function renderMatrix(){
+  let html = `<table><tr><th></th>`;
+  for(let c=0;c<n;c++) html+=`<th>${c+1}</th>`;
+  html+=`</tr>`;
+  for(let r=0;r<n;r++){
+    html+=`<tr><th>${r+1}</th>`;
+    for(let c=0;c<n;c++){
+      const val = dist[r][c]>=BIG ? '∞' : dist[r][c];
+      const hl = (r===state.i&&c===state.j)||(r===state.i&&c===state.k)||(r===state.k&&c===state.j);
+      html+=`<td class="${hl?'highlight':''}">${val}</td>`;
+    }
+    html+=`</tr>`;
+  }
+  html+=`</table>`;
+  document.getElementById('matrixContainer').innerHTML = html;
+}
+
+function renderCode(){
+  const c =
+`for (int k = 0; k < n; k++) {
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      if (d[i][k] < INF && d[k][j] < INF)
+        d[i][j] = min(d[i][j], d[i][k] + d[k][j]);
+    }
+  }
+}
+
+→ Executando agora: k=${state.k}, i=${state.i}, j=${state.j}`;
+  document.getElementById('codeBox').textContent = c;
+}
+
+// CANVAS: grafo
+const graphCanvas = document.getElementById('graphCanvas');
+const gctx = graphCanvas.getContext('2d');
+
+function resizeCanvas(){
+  graphCanvas.width = graphCanvas.clientWidth * devicePixelRatio;
+  graphCanvas.height = graphCanvas.clientHeight * devicePixelRatio;
+  gctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+}
+
+function drawGraph(){
+  const width = graphCanvas.clientWidth;
+  const height = graphCanvas.clientHeight;
+
+  const pos = [
+    [width*0.25, height*0.22],
+    [width*0.75, height*0.22],
+    [width*0.25, height*0.78],
+    [width*0.75, height*0.78]
+  ];
+
+  gctx.clearRect(0,0,width,height);
+  gctx.font='30px Inter, Arial, sans-serif';
+  gctx.lineWidth=3;
+
+  gctx.strokeStyle='#9ca3af';
+  gctx.fillStyle='#9ca3af';
+  edges.forEach(([a,b,c])=>{
+    const[x1,y1]=pos[a],[x2,y2]=pos[b];
+    gctx.beginPath(); gctx.moveTo(x1,y1); gctx.lineTo(x2,y2); gctx.stroke();
+    const midX=(x1+x2)/2, midY=(y1+y2)/2;
+    gctx.fillText(String(c), midX, midY-8);
+  });
+
+  pos.forEach(([x,y],idx)=>{
+    gctx.beginPath();
+    gctx.arc(x,y,25,0,Math.PI*2);
+    gctx.fillStyle='#0e0f13'; gctx.fill();
+    gctx.strokeStyle='#fff'; gctx.stroke();
+    gctx.fillStyle='#fff'; gctx.textAlign='center'; gctx.textBaseline='middle';
+    gctx.fillText(String(idx+1),x,y);
+  });
+
+  const {k,i,j}=state;
+  if(k<n){
+    const[xi,yi]=pos[i],[xj,yj]=pos[j],[xk,yk]=pos[k];
+
+    gctx.strokeStyle='#06b6d4';
+    gctx.lineWidth=6;
+    gctx.beginPath(); gctx.moveTo(xi,yi); gctx.lineTo(xk,yk); gctx.stroke();
+    gctx.beginPath(); gctx.moveTo(xk,yk); gctx.lineTo(xj,yj); gctx.stroke();
+
+    gctx.fillStyle='#06b6d4';
+    const dik=dist[i][k]>=BIG?'∞':dist[i][k];
+    const dkj=dist[k][j]>=BIG?'∞':dist[k][j];
+    gctx.fillText(`d[${i+1}][${k+1}]=${dik}`, xk-70, yk-35);
+    gctx.fillText(`d[${k+1}][${j+1}]=${dkj}`, xk+20, yk+45);
+
+    gctx.strokeStyle='#ef4444';
+    gctx.beginPath(); gctx.moveTo(xi,yi); gctx.lineTo(xj,yj); gctx.stroke();
+  }
+}
+
+// PLOT: y = x^2 / log x
+const plotCanvas = document.getElementById('plotCanvas');
+const pctx = plotCanvas.getContext('2d');
+
+// Variáveis para o hover
+let mouseX = 0, mouseY = 0;
+let hoveredPoint = null;
+let tooltip = null;
+
+function resizePlot(){
+  plotCanvas.width = plotCanvas.clientWidth * devicePixelRatio;
+  plotCanvas.height = plotCanvas.clientHeight * devicePixelRatio;
+  pctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+}
+
+function handlePlotMouseMove(event) {
+  const rect = plotCanvas.getBoundingClientRect();
+  mouseX = (event.clientX - rect.left) * devicePixelRatio;
+  mouseY = (event.clientY - rect.top) * devicePixelRatio;
+  
+  // Redesenha o gráfico para mostrar o ponto
+  drawPlot();
+}
+
+function handlePlotMouseLeave() {
+  hoveredPoint = null;
+  if (tooltip) {
+    tooltip.remove();
+    tooltip = null;
+  }
+  drawPlot();
+}
+
+function drawPlot(){
+  const W = plotCanvas.clientWidth;
+  const H = plotCanvas.clientHeight;
+  pctx.clearRect(0,0,W,H);
+
+  // parâmetros do gráfico
+  const xMin = 2;
+  const xMax = 500;
+  // compute y values to find yMax (avoid Infinity near 1)
+  let ys = [];
+  for(let x = xMin; x <= xMax; x++){
+    const y = (x*x) / Math.log(x);
+    ys.push(y);
+  }
+  // use some percentil para yMax para evitar outliers extremos no topo
+  const sorted = ys.slice().sort((a,b)=>a-b);
+  const yMax = sorted[Math.floor(sorted.length*0.98)] || sorted[sorted.length-1];
+  const yMin = 0;
+
+  // margens
+  const margin = 40;
+  const plotW = W - margin*2;
+  const plotH = H - margin*2;
+
+  // Lógica do hover - calcule a posição do mouse em coordenadas do gráfico
+  const plotMouseX = ((mouseX / devicePixelRatio) - margin);
+  const plotMouseY = ((mouseY / devicePixelRatio) - margin);
+  
+  hoveredPoint = null;
+  
+  // Se o mouse estiver dentro da área do gráfico
+  if (plotMouseX >= 0 && plotMouseX <= plotW && plotMouseY >= 0 && plotMouseY <= plotH) {
+    const graphX = xMin + (plotMouseX / plotW) * (xMax - xMin);
+    const graphY = yMin + (1 - (plotMouseY / plotH)) * (yMax - yMin);
+    
+    // Calcule o valor Y real da curva neste X
+    const actualY = (graphX * graphX) / Math.log(graphX);
+    
+    // Verifique se estamos perto da curva (com uma margem de tolerância)
+    const tolerance = (yMax - yMin) * 0.05; // 5% da altura do gráfico
+    if (Math.abs(graphY - actualY) < tolerance) {
+      hoveredPoint = {
+        x: graphX,
+        y: actualY,
+        screenX: margin + plotMouseX,
+        screenY: margin + (1 - ((actualY - yMin) / (yMax - yMin))) * plotH
+      };
+    }
+  }
+
+  // eixos
+  pctx.strokeStyle = '#39414a';
+  pctx.lineWidth = 1;
+  // eixo X
+  pctx.beginPath();
+  pctx.moveTo(margin, H - margin);
+  pctx.lineTo(W - margin, H - margin);
+  pctx.stroke();
+  // eixo Y
+  pctx.beginPath();
+  pctx.moveTo(margin, margin);
+  pctx.lineTo(margin, H - margin);
+  pctx.stroke();
+
+  // ticks e labels no eixo X (marca alguns pontos)
+  pctx.fillStyle = '#9ca3af';
+  pctx.font = '12px Inter, Arial, sans-serif';
+  pctx.textAlign = 'center';
+  const xticks = [2,5,10,50,100,200,300,400,500];
+  xticks.forEach(tx=>{
+    const sx = margin + ((tx - xMin)/(xMax - xMin)) * plotW;
+    pctx.beginPath();
+    pctx.moveTo(sx, H - margin);
+    pctx.lineTo(sx, H - margin + 6);
+    pctx.stroke();
+    pctx.fillText(String(tx), sx, H - margin + 18);
+  });
+
+  // ticks no eixo Y (4 marcas)
+  pctx.textAlign = 'right';
+  const yTicksCount = 4;
+  for(let t=0;t<=yTicksCount;t++){
+    const frac = t / yTicksCount;
+    const yVal = yMin + (1-frac)*(yMax - yMin);
+    const sy = margin + frac * plotH;
+    pctx.beginPath();
+    pctx.moveTo(margin - 6, sy);
+    pctx.lineTo(margin, sy);
+    pctx.stroke();
+    // formata número com notação curta
+    let label;
+    if(yVal >= 1e6) label = (yVal/1e6).toFixed(1) + 'M';
+    else if(yVal >= 1e3) label = (yVal/1e3).toFixed(1) + 'k';
+    else label = Math.round(yVal).toString();
+    pctx.fillText(label, margin - 10, sy + 4);
+  }
+
+  // desenha a curva
+  pctx.lineWidth = 2;
+  pctx.strokeStyle = '#2dd4bf';
+  pctx.beginPath();
+  for(let px = 0; px <= plotW; px++){
+    const x = xMin + (px/plotW) * (xMax - xMin);
+    const y = (x*x) / Math.log(x);
+    // map para coordenadas de tela
+    const sx = margin + px;
+    // clamp y para evitar valores absurdos durante plot
+    const yClamped = Math.min(y, yMax);
+    const sy = margin + (1 - ( (yClamped - yMin) / (yMax - yMin) )) * plotH;
+    if(px===0) pctx.moveTo(sx, sy);
+    else pctx.lineTo(sx, sy);
+  }
+  pctx.stroke();
+
+  // Desenhe o ponto de hover se necessário
+  if (hoveredPoint) {
+    // Desenha uma linha vertical tracejada
+    pctx.strokeStyle = 'rgba(45, 212, 191, 0.5)';
+    pctx.setLineDash([5, 5]);
+    pctx.beginPath();
+    pctx.moveTo(hoveredPoint.screenX, margin);
+    pctx.lineTo(hoveredPoint.screenX, H - margin);
+    pctx.stroke();
+    pctx.setLineDash([]);
+    
+    // Desenha o ponto na curva
+    pctx.fillStyle = '#2dd4bf';
+    pctx.beginPath();
+    pctx.arc(hoveredPoint.screenX, hoveredPoint.screenY, 6, 0, Math.PI * 2);
+    pctx.fill();
+    
+    // Atualiza ou cria o tooltip
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.className = 'tooltip';
+      document.body.appendChild(tooltip);
+    }
+    
+    tooltip.innerHTML = `x = ${hoveredPoint.x.toFixed(1)}<br>y = ${hoveredPoint.y.toFixed(1)}`;
+    tooltip.style.left = `${hoveredPoint.screenX + 10}px`;
+    tooltip.style.top = `${hoveredPoint.screenY - 40}px`;
+  } else if (tooltip) {
+    tooltip.remove();
+    tooltip = null;
+  }
+
+  // rótulo
+  pctx.fillStyle = '#9ca3af';
+  pctx.font = '13px Inter, Arial, sans-serif';
+  pctx.textAlign = 'left';
+  pctx.fillText('y = x² / log(x)', margin + 6, margin + 14);
+}
+
+// função de atualização global
+function updateAll(){
+  renderMatrix();
+  renderCode();
+  resizeCanvas();
+  drawGraph();
+  resizePlot();
+  drawPlot();
+  document.getElementById('status').textContent =
+    state.k>=n ? 'Execução concluída' : `k=${state.k}, i=${state.i}, j=${state.j}`;
+}
+
+document.getElementById('nextStep').addEventListener('click',()=>{stepForward();updateAll();});
+document.getElementById('prevStep').addEventListener('click',()=>{stepBackward();updateAll();});
+
+// Adiciona os event listeners para o gráfico
+plotCanvas.addEventListener('mousemove', handlePlotMouseMove);
+plotCanvas.addEventListener('mouseleave', handlePlotMouseLeave);
+
+updateAll();
+window.addEventListener('resize',updateAll);
+</script>
+</body>
+</html>
